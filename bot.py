@@ -6,7 +6,7 @@ from handlers.start_handler import register_start_handler
 from handlers.quest_handler import register_quest_handler
 from handlers.photo_handler import register_photo_handler
 from handlers.finish_handler import register_finish_handler
-from utils.db_manager import add_user_if_not_exists, save_user_photo_path
+from utils.db_manager import add_user_if_not_exists, save_user_photo_url
 
 # Создаем папку для фото, если нет
 if not os.path.exists("photos"):
@@ -36,7 +36,7 @@ def handle_photo(message):
             f.write(downloaded_file)
 
         # Сохраняем путь в БД
-        save_user_photo_path(user_id, file_name)
+        save_user_photo_url(user_id, file_name)
 
     except Exception as e:
         print("❌ Ошибка при сохранении фото:", e)

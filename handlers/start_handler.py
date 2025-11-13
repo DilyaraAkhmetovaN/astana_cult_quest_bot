@@ -3,7 +3,7 @@ from telebot import types
 import traceback
 import cloudinary
 import cloudinary.uploader
-from utils.db_manager import add_user_if_not_exists, get_user_language, set_user_language, update_user, save_user_photo_path, update_user_photo_status
+from utils.db_manager import add_user_if_not_exists, get_user_language, set_user_language, update_user, save_user_photo_url, update_user_photo_status
 from utils.quest_manager import get_current_quest_text
 from utils.keyboard_factory import create_inline_keyboard
 from handlers.finish_handler import finish_game
@@ -120,7 +120,7 @@ def register_start_handler(bot):
             if not file_url:
                 raise Exception("Не удалось получить URL фото из Cloudinary")
 
-            save_user_photo_path(telegram_id, file_url)
+            save_user_photo_url(telegram_id, file_url)
             update_user_photo_status(telegram_id, status=1)
 
             lang = get_user_language(telegram_id)
