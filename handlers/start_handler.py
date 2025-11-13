@@ -89,11 +89,15 @@ def register_start_handler(bot):
             update_user(chat_id, name=name, age=age)
 
             if lang == "kk":
-                text = f"✅ Тіркеу сәтті өтті, {name}!\n\n📷 Енді сурет жіберіңіз:"
+                text = f"✅ Тіркеу сәтті өтті, {name}!\n\n🎮 Ойынды бастау үшін төмендегі батырманы басыңыз:"
+                start_btn = "🎮 Ойынды бастау"
             else:
-                text = f"✅ Регистрация прошла успешно, {name}!\n\n📷 Теперь отправьте фото:"
+                text = f"✅ Регистрация прошла успешно, {name}!\n\n🎮 Нажмите кнопку ниже, чтобы начать игру:"
+                start_btn = "🎮 Начать игру"
 
-            bot.send_message(chat_id, text)
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton(start_btn, callback_data="start_game"))
+            bot.send_message(chat_id, text, reply_markup=markup)
 
         except Exception as e:
             print("❌ Ошибка в start_handler (registration_done):", e)
