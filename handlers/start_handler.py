@@ -8,7 +8,6 @@ from utils.quest_manager import get_current_quest_text
 from utils.keyboard_factory import create_inline_keyboard
 from handlers.finish_handler import finish_game
 
-# Настройка Cloudinary
 cloudinary.config(
     cloud_name="dqw6v5rlg",
     api_key="693713551172145",
@@ -16,7 +15,7 @@ cloudinary.config(
 )
 
 def register_start_handler(bot):
-    # Команда /start — приветствие и выбор языка
+    # /start — приветствие и выбор языка
     @bot.message_handler(commands=['start'])
     def start(message):
         try:
@@ -45,7 +44,7 @@ def register_start_handler(bot):
             print("❌ Ошибка в start_handler (/start):", e)
             traceback.print_exc()
 
-    # Выбор языка пользователем
+    # Выбор языка
     @bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
     def language_choice(call):
         try:
@@ -53,18 +52,18 @@ def register_start_handler(bot):
             lang = call.data.split("_")[1]
             set_user_language(chat_id, lang)
 
-            if lang == "kk":
-                text = "Ойынды бастау үшін тіркеліңіз.\nАтыңызды және жасыңызды енгізіңіз:\n📌 Мысалы: Айгерім, 20 жас"
-            else:
-                text = "Чтобы начать игру, зарегистрируйтесь.\nВведите ваше имя и возраст:\n📌 Например: Айгерим, 22 года"
-
+            text = (
+                "Ойынды бастау үшін тіркеліңіз.\nАтыңызды және жасыңызды енгізіңіз:\n📌 Мысалы: Айгерім, 20 жас"
+                if lang=="kk" else
+                "Чтобы начать игру, зарегистрируйтесь.\nВведите ваше имя и возраст:\n📌 Например: Айгерим, 22 года"
+            )
             bot.send_message(chat_id, text)
 
         except Exception as e:
             print("❌ Ошибка в start_handler (language_choice):", e)
             traceback.print_exc()
 
-    # Обработка имени и возраста
+    # Ввод имени и возраста
     @bot.message_handler(func=lambda msg: "," in msg.text)
     def registration_done(message):
         try:
@@ -88,16 +87,12 @@ def register_start_handler(bot):
 
             update_user(chat_id, name=name, age=age)
 
-            if lang == "kk":
-                text = f"✅ Тіркеу сәтті өтті, {name}!\n\n🎮 Ойынды бастау үшін төмендегі батырманы басыңыз:"
-                start_btn = "🎮 Ойынды бастау"
-            else:
-                text = f"✅ Регистрация прошла успешно, {name}!\n\n🎮 Нажмите кнопку ниже, чтобы начать игру:"
-                start_btn = "🎮 Начать игру"
-
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton(start_btn, callback_data="start_game"))
-            bot.send_message(chat_id, text, reply_markup=markup)
+            text = (
+                f"✅ Тіркеу сәтті өтті, {name}!\n\n📷 Енді сурет жіберіңіз:"
+                if lang=="kk" else
+                f"✅ Регистрация прошла успешно, {name}!\n\n📷 Теперь отправьте фото:"
+            )
+            bot.send_message(chat_id, text)
 
         except Exception as e:
             print("❌ Ошибка в start_handler (registration_done):", e)
@@ -107,12 +102,12 @@ def register_start_handler(bot):
     @bot.message_handler(content_types=['photo'])
     def handle_photo(message):
         telegram_id = message.from_user.id
+        lang = get_user_language(telegram_id)
         try:
             photo = message.photo[-1]
             file_info = bot.get_file(photo.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
 
-            # Загрузка в Cloudinary
             upload_result = cloudinary.uploader.upload(
                 downloaded_file,
                 folder="astana_cult_quest",
@@ -127,10 +122,12 @@ def register_start_handler(bot):
             save_user_photo_url(telegram_id, file_url)
             update_user_photo_status(telegram_id, status=1)
 
-            lang = get_user_language(telegram_id)
             bot.send_message(telegram_id, "🔥 Отлично! Фото принято." if lang=="ru" else "🔥 Керемет! Сурет қабылданды.")
 
+            # Получаем следующий квест
             next_quest_text, options = get_current_quest_text(telegram_id, lang)
+            print("DEBUG: next_quest_text=", next_quest_text, "options=", options)  # Отладка
+
             if next_quest_text:
                 keyboard = create_inline_keyboard(options)
                 bot.send_message(telegram_id, next_quest_text, reply_markup=keyboard)
@@ -140,4 +137,6 @@ def register_start_handler(bot):
         except Exception as e:
             print("❌ Ошибка при обработке фото:", e)
             traceback.print_exc()
-            bot.send_message(telegram_id, "❌ Произошла ошибка при обработке фото. Попробуйте снова." if lang=="ru" else "❌ Суретті өңдеуде қате шықты. Қайталап көріңіз.")
+            bot.send_message(telegram_id,
+                             "❌ Произошла ошибка при обработке фото. Попробуйте снова." if lang=="ru" else
+                             "❌ Суретті өңдеуде қате шықты. Қайталап көріңіз.")
