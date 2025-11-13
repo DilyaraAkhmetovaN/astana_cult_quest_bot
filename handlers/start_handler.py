@@ -1,7 +1,19 @@
 # handlers/start_handler.py
 from telebot import types
 import traceback
-from utils.db_manager import add_user_if_not_exists, get_user_language, set_user_language, update_user
+import cloudinary
+import cloudinary.uploader
+from utils.db_manager import add_user_if_not_exists, get_user_language, set_user_language, update_user, save_user_photo_path, update_user_photo_status
+from utils.quest_manager import get_current_quest_text
+from utils.keyboard_factory import create_inline_keyboard
+from handlers.finish_handler import finish_game
+
+# Настройка Cloudinary
+cloudinary.config(
+    cloud_name="dqw6v5rlg",
+    api_key="693713551172145",
+    api_secret="tlMIXfpI5OsdasNXQe7ey1Cb9As"
+)
 
 def register_start_handler(bot):
     # Команда /start — приветствие и выбор языка
@@ -11,22 +23,16 @@ def register_start_handler(bot):
             chat_id = message.chat.id
             add_user_if_not_exists(chat_id)
 
-            # Приветственное сообщение на двух языках
             welcome_text = (
                 "🇰🇿\n"
                 "👋 Сәлем! «Astana CULT QUEST» интерактивті ойынына қош келдіңіз!\n"
-                "Бұл ойын арқылы сіз Астананың мәдени және тарихи нысандарын аралап, қызықты тапсырмаларды орындайсыз.\n"
-                "🎯 *Мақсат:* қаламызды жаңа қырынан танып, мәдениетпен жақын танысу.\n"
-                "Бұл ойын «Тарих және мәдениет саласындағы волонтерлікті дамыту» жобасы аясында жүзеге асырылуда.\n\n"
+                "🎯 *Мақсат:* қаламызды жаңа қырынан танып, мәдениетпен жақын танысу.\n\n"
                 "🇷🇺\n"
                 "👋 Привет! Добро пожаловать в интерактивную игру «Astana CULT QUEST»!\n"
-                "С помощью этой игры вы посетите культурные и исторические объекты Астаны и выполните увлекательные задания.\n"
-                "🎯 *Цель:* узнать город с новой стороны и прикоснуться к культуре.\n"
-                "Игра проводится в рамках проекта «Развитие волонтёрства в сфере истории и культуры».\n\n"
+                "🎯 *Цель:* узнать город с новой стороны и прикоснуться к культуре.\n\n"
                 "🌐 Тілді таңдаңыз / Выберите язык:"
             )
 
-            # Кнопки выбора языка
             markup = types.InlineKeyboardMarkup()
             markup.add(
                 types.InlineKeyboardButton("🇰🇿 Қазақ тілі", callback_data="lang_kk"),
@@ -48,17 +54,9 @@ def register_start_handler(bot):
             set_user_language(chat_id, lang)
 
             if lang == "kk":
-                text = (
-                    "👋 Сәлем! «Astana CULT QUEST» ойынына қош келдіңіз!\n\n"
-                    "Ойынды бастау үшін тіркеліңіз.\n"
-                    "Атыңызды және жасыңызды енгізіңіз:\n📌 Мысалы: Айгерім, 20 жас"
-                )
+                text = "Ойынды бастау үшін тіркеліңіз.\nАтыңызды және жасыңызды енгізіңіз:\n📌 Мысалы: Айгерім, 20 жас"
             else:
-                text = (
-                    "👋 Привет! Добро пожаловать в игру «Astana CULT QUEST»!\n\n"
-                    "Чтобы начать игру, зарегистрируйтесь.\n"
-                    "Введите ваше имя и возраст:\n📌 Например: Айгерим, 22 года"
-                )
+                text = "Чтобы начать игру, зарегистрируйтесь.\nВведите ваше имя и возраст:\n📌 Например: Айгерим, 22 года"
 
             bot.send_message(chat_id, text)
 
@@ -76,50 +74,66 @@ def register_start_handler(bot):
             if lang not in ["ru", "kk"]:
                 lang = "ru"
 
-            # Проверка правильности формата
-            if "," not in user_input:
-                if lang == "kk":
-                    bot.send_message(chat_id, "⚠️ Деректерді келесідей енгізіңіз: Айгерім, 20 жас")
-                else:
-                    bot.send_message(chat_id, "⚠️ Введите данные в формате: Айгерим, 22 года")
-                return
-
-            # Разделяем имя и возраст
             parts = [p.strip() for p in user_input.split(",", 1)]
-            name = parts[0]
-            age_str = parts[1] if len(parts) > 1 else ""
-
-            # Преобразуем возраст в число (оставляем только цифры)
-            try:
-                age = int(''.join(filter(str.isdigit, age_str)))
-            except ValueError:
-                if lang == "kk":
-                    bot.send_message(chat_id, "⚠️ Жас санымен енгізіңіз: мысалы, 20")
-                else:
-                    bot.send_message(chat_id, "⚠️ Введите возраст цифрами: например, 22")
+            if len(parts) < 2:
+                bot.send_message(chat_id, "⚠️ Формат неверный, используйте: Имя, Возраст" if lang=="ru" else "⚠️ Деректерді келесідей енгізіңіз: Аты, Жасы")
                 return
 
-            # Сохраняем данные пользователя
+            name = parts[0]
+            try:
+                age = int(''.join(filter(str.isdigit, parts[1])))
+            except ValueError:
+                bot.send_message(chat_id, "⚠️ Введите возраст цифрами" if lang=="ru" else "⚠️ Жасты санмен енгізіңіз")
+                return
+
             update_user(chat_id, name=name, age=age)
 
-            # Сообщение после успешной регистрации
             if lang == "kk":
-                text = (
-                    f"✅ Тіркеу сәтті өтті, {name}!\n\n"
-                    "🎮 Ойынды бастау үшін төмендегі батырманы басыңыз:"
-                )
-                start_btn = "🎮 Ойынды бастау"
+                text = f"✅ Тіркеу сәтті өтті, {name}!\n\n📷 Енді сурет жіберіңіз:"
             else:
-                text = (
-                    f"✅ Регистрация прошла успешно, {name}!\n\n"
-                    "🎮 Нажмите кнопку ниже, чтобы начать игру:"
-                )
-                start_btn = "🎮 Начать игру"
+                text = f"✅ Регистрация прошла успешно, {name}!\n\n📷 Теперь отправьте фото:"
 
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton(start_btn, callback_data="start_game"))
-            bot.send_message(chat_id, text, reply_markup=markup)
+            bot.send_message(chat_id, text)
 
         except Exception as e:
             print("❌ Ошибка в start_handler (registration_done):", e)
             traceback.print_exc()
+
+    # Обработка фото после регистрации
+    @bot.message_handler(content_types=['photo'])
+    def handle_photo(message):
+        telegram_id = message.from_user.id
+        try:
+            photo = message.photo[-1]
+            file_info = bot.get_file(photo.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+
+            # Загрузка в Cloudinary
+            upload_result = cloudinary.uploader.upload(
+                downloaded_file,
+                folder="astana_cult_quest",
+                public_id=f"user_{telegram_id}_{photo.file_id}",
+                overwrite=True
+            )
+
+            file_url = upload_result.get("secure_url")
+            if not file_url:
+                raise Exception("Не удалось получить URL фото из Cloudinary")
+
+            save_user_photo_path(telegram_id, file_url)
+            update_user_photo_status(telegram_id, status=1)
+
+            lang = get_user_language(telegram_id)
+            bot.send_message(telegram_id, "🔥 Отлично! Фото принято." if lang=="ru" else "🔥 Керемет! Сурет қабылданды.")
+
+            next_quest_text, options = get_current_quest_text(telegram_id, lang)
+            if next_quest_text:
+                keyboard = create_inline_keyboard(options)
+                bot.send_message(telegram_id, next_quest_text, reply_markup=keyboard)
+            else:
+                finish_game(bot, telegram_id)
+
+        except Exception as e:
+            print("❌ Ошибка при обработке фото:", e)
+            traceback.print_exc()
+            bot.send_message(telegram_id, "❌ Произошла ошибка при обработке фото. Попробуйте снова." if lang=="ru" else "❌ Суретті өңдеуде қате шықты. Қайталап көріңіз.")

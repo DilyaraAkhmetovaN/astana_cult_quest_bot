@@ -134,14 +134,20 @@ def update_user(telegram_id, name=None, age=None):
                 if name is not None:
                     cur.execute("UPDATE users SET name=%s WHERE telegram_id=%s", (name, telegram_id))
                 if age is not None:
-                    cur.execute("UPDATE users SET age=%s WHERE telegram_id=%s", (age, telegram_id))
+                    # Преобразуем возраст к числу, если он в формате "22 года" или "20 жас"
+                    try:
+                        age_int = int(''.join(filter(str.isdigit, str(age))))
+                    except ValueError:
+                        age_int = None
+                    if age_int is not None:
+                        cur.execute("UPDATE users SET age=%s WHERE telegram_id=%s", (age_int, telegram_id))
     except Exception as e:
         print("❌ Ошибка в update_user:", e)
         traceback.print_exc()
 
 
-def save_user_photo_path(telegram_id, file_path):
-    """Сохраняет путь к фото пользователя"""
+def save_user_photo_url(telegram_id, url):
+    """Сохраняет URL фото пользователя (Cloudinary)"""
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
@@ -150,15 +156,15 @@ def save_user_photo_path(telegram_id, file_path):
                     CREATE TABLE IF NOT EXISTS photos (
                         id SERIAL PRIMARY KEY,
                         user_id BIGINT REFERENCES users(telegram_id),
-                        file_path TEXT,
+                        url TEXT,
                         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
-                # Сохраняем путь к фото
+                # Сохраняем URL
                 cur.execute(
-                    "INSERT INTO photos (user_id, file_path) VALUES (%s, %s)",
-                    (telegram_id, file_path)
+                    "INSERT INTO photos (user_id, url) VALUES (%s, %s)",
+                    (telegram_id, url)
                 )
     except Exception as e:
-        print("❌ Ошибка в save_user_photo_path:", e)
+        print("❌ Ошибка в save_user_photo_url:", e)
         traceback.print_exc()

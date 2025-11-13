@@ -1,16 +1,20 @@
 # handlers/photo_handler.py
-import os
 import telebot
 import traceback
 from telebot.types import Message
-from utils.db_manager import update_user_photo_status, save_user_photo_path, get_user_language
+import cloudinary
+import cloudinary.uploader
+from utils.db_manager import update_user_photo_status, save_user_photo_url, get_user_language
 from utils.quest_manager import get_current_quest_text
 from utils.keyboard_factory import create_inline_keyboard
 from handlers.finish_handler import finish_game
 
-# Папка для хранения фото
-PHOTOS_DIR = "photos"
-os.makedirs(PHOTOS_DIR, exist_ok=True)
+# Настройка Cloudinary
+cloudinary.config(
+    cloud_name="YOUR_CLOUD_NAME",
+    api_key="YOUR_API_KEY",
+    api_secret="YOUR_API_SECRET"
+)
 
 def register_photo_handler(bot: telebot.TeleBot):
     @bot.message_handler(content_types=['photo'])
@@ -23,18 +27,23 @@ def register_photo_handler(bot: telebot.TeleBot):
             file_info = bot.get_file(photo.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
 
-            # Генерируем уникальное имя файла
-            file_name = f"{telegram_id}_{photo.file_id}.jpg"
-            file_path = os.path.join(PHOTOS_DIR, file_name)
-            
-            # Сохраняем файл на диск
-            with open(file_path, "wb") as f:
-                f.write(downloaded_file)
+            # Загружаем фото в Cloudinary
+            upload_result = cloudinary.uploader.upload(
+                downloaded_file,
+                folder="astana_cult_quest",
+                public_id=f"user_{telegram_id}_{photo.file_id}",
+                overwrite=True
+            )
 
-            # Сохраняем путь к фото в базе PostgreSQL
-            save_user_photo_path(telegram_id, file_path)
+            # Получаем ссылку на загруженное фото
+            file_url = upload_result.get("secure_url")
+            if not file_url:
+                raise Exception("Не удалось получить ссылку на фото из Cloudinary")
 
-            # Обновляем статус, что пользователь прислал фото
+            # Сохраняем ссылку на фото в PostgreSQL
+            save_user_photo_url(telegram_id, file_url)
+
+            # Обновляем статус отправки фото
             update_user_photo_status(telegram_id, status=1)
 
             # Получаем язык пользователя
