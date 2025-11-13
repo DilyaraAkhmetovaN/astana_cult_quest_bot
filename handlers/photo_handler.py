@@ -11,9 +11,9 @@ from handlers.finish_handler import finish_game
 
 # Настройка Cloudinary
 cloudinary.config(
-    cloud_name="YOUR_CLOUD_NAME",
-    api_key="YOUR_API_KEY",
-    api_secret="YOUR_API_SECRET"
+    cloud_name="dqw6v5rlg",
+    api_key="693713551172145",
+    api_secret="tlMIXfpI5OsdasNXQe7ey1Cb9As"
 )
 
 def register_photo_handler(bot: telebot.TeleBot):
