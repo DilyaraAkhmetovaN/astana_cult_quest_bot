@@ -1,10 +1,10 @@
-import psycopg2
+import psycopg
 import os
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    return psycopg.connect(DATABASE_URL, sslmode="require")
 
 def create_tables():
     conn = get_connection()

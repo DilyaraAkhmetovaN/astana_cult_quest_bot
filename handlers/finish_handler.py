@@ -1,12 +1,14 @@
 # handlers/finish_handler.py
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from utils.db_manager import get_user_language
+from utils.db_manager import get_user_language, mark_user_finished
 import traceback
-
 
 def finish_game(bot, chat_id):
     """Финальное сообщение после завершения всех квестов"""
     try:
+        # Помечаем пользователя как завершившего игру
+        mark_user_finished(chat_id)
+
         lang = get_user_language(chat_id)
 
         if lang == "kk":
@@ -49,9 +51,15 @@ def register_finish_handler(bot):
                 bot.answer_callback_query(call.id)
                 lang = get_user_language(call.message.chat.id)
                 if lang == "kk":
-                    bot.send_message(call.message.chat.id, "✅ Рақмет! Сіздің өтініміңіз тіркелді. Ұйымдастырушылар жақын арада сізге хабарласады.")
+                    bot.send_message(
+                        call.message.chat.id,
+                        "✅ Рақмет! Сіздің өтініміңіз тіркелді. Ұйымдастырушылар жақын арада сізге хабарласады."
+                    )
                 else:
-                    bot.send_message(call.message.chat.id, "✅ Спасибо! Ваша заявка зарегистрирована. Организаторы свяжутся с вами в ближайшее время.")
+                    bot.send_message(
+                        call.message.chat.id,
+                        "✅ Спасибо! Ваша заявка зарегистрирована. Организаторы свяжутся с вами в ближайшее время."
+                    )
             except Exception as e:
                 print("❌ Ошибка при обработке кнопки 'finish_ok':", e)
                 traceback.print_exc()

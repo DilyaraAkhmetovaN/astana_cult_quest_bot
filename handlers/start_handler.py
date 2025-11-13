@@ -1,7 +1,7 @@
+# handlers/start_handler.py
 from telebot import types
 import traceback
 from utils.db_manager import add_user_if_not_exists, get_user_language, set_user_language, update_user
-
 
 def register_start_handler(bot):
     # Команда /start — приветствие и выбор языка
@@ -87,7 +87,17 @@ def register_start_handler(bot):
             # Разделяем имя и возраст
             parts = [p.strip() for p in user_input.split(",", 1)]
             name = parts[0]
-            age = parts[1] if len(parts) > 1 else ""
+            age_str = parts[1] if len(parts) > 1 else ""
+
+            # Преобразуем возраст в число (оставляем только цифры)
+            try:
+                age = int(''.join(filter(str.isdigit, age_str)))
+            except ValueError:
+                if lang == "kk":
+                    bot.send_message(chat_id, "⚠️ Жас санымен енгізіңіз: мысалы, 20")
+                else:
+                    bot.send_message(chat_id, "⚠️ Введите возраст цифрами: например, 22")
+                return
 
             # Сохраняем данные пользователя
             update_user(chat_id, name=name, age=age)
