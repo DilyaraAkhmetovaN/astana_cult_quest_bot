@@ -20,27 +20,6 @@ register_quest_handler(bot)
 register_photo_handler(bot)
 register_finish_handler(bot)
 
-# Обработчик фото, чтобы сохранять файл
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    user_id = message.from_user.id
-
-    try:
-        # Берем лучшее качество фото
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        
-        # Сохраняем в папку photos/
-        file_name = f"photos/{user_id}_{message.photo[-1].file_id}.jpg"
-        with open(file_name, "wb") as f:
-            f.write(downloaded_file)
-
-        # Сохраняем путь в БД
-        save_user_photo_url(user_id, file_name)
-
-    except Exception as e:
-        print("❌ Ошибка при сохранении фото:", e)
-
 if __name__ == "__main__":
     print("✅ Бот запущен и слушает команды...")
     try:
