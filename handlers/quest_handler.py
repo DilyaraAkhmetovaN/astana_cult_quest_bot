@@ -3,49 +3,41 @@ import json
 import traceback
 from telebot import types
 from utils.db_manager import get_user_progress, set_user_progress, get_user_language
+from handlers.finish_handler import finish_game
 from config import QUESTS_FILE
 
-
-# 🔹 Загружаем все квесты один раз при запуске
+# Загружаем квесты один раз при старте
 with open(QUESTS_FILE, encoding='utf-8') as f:
     quests = json.load(f)
 
 
 def send_quest(chat_id, bot):
-    """Отправляет текущее задание пользователю на нужном языке с картинкой"""
+    """Отправляет текущее задание пользователю с кнопками и картинкой"""
     try:
         progress = get_user_progress(chat_id)
         lang = get_user_language(chat_id)
-
         if lang not in ["ru", "kk"]:
             lang = "ru"
 
-        # 🔸 Если квестов больше нет — завершение игры
         if progress >= len(quests):
-            from handlers.finish_handler import finish_game
             finish_game(bot, chat_id)
             return
 
-        # 🔸 Получаем текущий квест на нужном языке
         quest = quests[progress].get(lang, {})
         text = quest.get("text", "")
         options = quest.get("options", [])
-        image_path = quest.get("image")  # путь к картинке из JSON
+        image_path = quest.get("image", None)
 
         if not text:
-            bot.send_message(
-                chat_id,
-                "⚠️ Квест табылмады!" if lang == "kk" else "⚠️ Ошибка: текст квеста не найден."
-            )
+            bot.send_message(chat_id,
+                             "⚠️ Квест табылмады!" if lang == "kk" else "⚠️ Ошибка: текст квеста не найден.")
             return
 
-        # 🔸 Создаем inline-кнопки с вариантами ответов
         keyboard = types.InlineKeyboardMarkup()
         for option in options:
             callback_data = f"answer_{option}_{progress}"
             keyboard.add(types.InlineKeyboardButton(text=option, callback_data=callback_data))
 
-        # 🔸 Отправка картинки (если указана)
         if image_path:
             try:
                 with open(image_path, 'rb') as img:
@@ -54,7 +46,6 @@ def send_quest(chat_id, bot):
                 print("❌ Ошибка при отправке картинки:", e)
                 bot.send_message(chat_id, text, reply_markup=keyboard)
         else:
-            # Если картинки нет, отправляем только текст
             bot.send_message(chat_id, text, reply_markup=keyboard)
 
     except Exception as e:
@@ -65,7 +56,7 @@ def send_quest(chat_id, bot):
 def register_quest_handler(bot):
     """Регистрирует обработчики квестов и ответов"""
 
-    # 🔹 Команда /quest — показать текущее задание вручную
+    # Показать квест по команде /quest
     @bot.message_handler(commands=['quest'])
     def handle_quest_command(message):
         try:
@@ -74,7 +65,7 @@ def register_quest_handler(bot):
             print("❌ Ошибка при вызове /quest:", e)
             traceback.print_exc()
 
-    # 🔹 Начало игры после регистрации
+    # Начало игры
     @bot.callback_query_handler(func=lambda call: call.data == "start_game")
     def handle_start_game(call):
         chat_id = call.message.chat.id
@@ -86,16 +77,15 @@ def register_quest_handler(bot):
             print("❌ Ошибка при старте игры:", e)
             traceback.print_exc()
 
-    # 🔹 Обработка ответов игрока
+    # Обработка ответов
     @bot.callback_query_handler(func=lambda call: call.data.startswith("answer_"))
     def handle_answer(call):
+        chat_id = call.message.chat.id
         try:
-            chat_id = call.message.chat.id
             data_parts = call.data.split("_")
             user_answer = data_parts[1]
             progress = int(data_parts[2])
             lang = get_user_language(chat_id)
-
             if lang not in ["ru", "kk"]:
                 lang = "ru"
 
@@ -104,37 +94,21 @@ def register_quest_handler(bot):
             photo_task = quest.get("photo_task", "")
 
             if user_answer == correct_answer:
-                # ✅ Верный ответ
-                bot.answer_callback_query(call.id, text="✅ Дұрыс!" if lang == "kk" else "✅ Верно!")
-                bot.send_message(
-                    chat_id,
-                    f"✅ Дұрыс! 📸 {photo_task}" if lang == "kk" else f"✅ Верно! 📸 {photo_task}"
-                )
-                # Обновляем прогресс
+                # ✅ сначала обновляем прогресс
                 set_user_progress(chat_id, progress + 1)
+
+                bot.answer_callback_query(call.id, text="✅ Дұрыс!" if lang == "kk" else "✅ Верно!")
+                if photo_task:
+                    bot.send_message(chat_id,
+                                     f"✅ Дұрыс! 📸 {photo_task}" if lang == "kk" else f"✅ Верно! 📸 {photo_task}")
+                else:
+                    # Если фото-задания нет, сразу отправляем следующий квест
+                    send_quest(chat_id, bot)
             else:
-                # ❌ Неверный ответ
                 bot.answer_callback_query(call.id, text="❌ Қате!" if lang == "kk" else "❌ Неверно!")
-                bot.send_message(
-                    chat_id,
-                    "Қайтадан байқап көріңіз!" if lang == "kk" else "Попробуйте ещё раз!"
-                )
+                bot.send_message(chat_id,
+                                 "Қайтадан байқап көріңіз!" if lang == "kk" else "Попробуйте ещё раз!")
 
         except Exception as e:
             print("❌ Ошибка в handle_answer:", e)
-            traceback.print_exc()
-
-    # 🔹 После отправки фото пользователем
-    @bot.message_handler(content_types=['photo'])
-    def handle_photo(message):
-        chat_id = message.chat.id
-        try:
-            lang = get_user_language(chat_id)
-            bot.send_message(
-                chat_id,
-                "🔥 Керемет! Келесі аялдама:" if lang == "kk" else "🔥 Отлично! Следующая остановка:"
-            )
-            send_quest(chat_id, bot)
-        except Exception as e:
-            print("❌ Ошибка при обработке фото:", e)
             traceback.print_exc()
