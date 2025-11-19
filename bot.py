@@ -1,5 +1,6 @@
 # bot.py
 import os
+import time
 import traceback
 from telebot import TeleBot
 from config import TOKEN
@@ -12,7 +13,7 @@ from handlers.finish_handler import register_finish_handler
 if not os.path.exists("photos"):
     os.makedirs("photos")
 
-bot = TeleBot(TOKEN)
+bot = TeleBot(TOKEN, threaded=True, num_threads=5)
 
 # Регистрируем все обработчики
 register_start_handler(bot)
@@ -22,10 +23,17 @@ register_finish_handler(bot)
 
 if __name__ == "__main__":
     print("✅ Бот запущен и слушает команды...")
-    try:
-        # Проверка на другие экземпляры бота перед запуском
-        # Telegram API не разрешает одновременно несколько getUpdates
-        bot.polling(non_stop=True, interval=0, timeout=30)
-    except Exception as e:
-        print(f"❌ Ошибка при запуске бота: {e}")
-        traceback.print_exc()
+
+    while True:
+        try:
+            bot.polling(
+                non_stop=True,
+                interval=0,
+                timeout=20,
+                long_polling_timeout=30,
+                allowed_updates=None
+            )
+        except Exception as e:
+            print("⚠️ Ошибка polling:", e)
+            traceback.print_exc()
+            time.sleep(3)  # Подождать и перезапустить
